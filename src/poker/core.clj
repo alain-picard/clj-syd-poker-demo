@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [==])
   (:require
    [clojure.math.combinatorics :as comb :refer [combinations]]
-   [clojure.core.logic :refer [run* == fresh membero distincto] :as l]))
+   [clojure.core.logic :refer :all]))
 
 
 ;;;;  Card Abstract data types.
@@ -62,6 +62,9 @@
   (> (card-value a) (card-value b)))
 
 (defn sort-hand [hand]
+  ;; FIXME! This is bogus because it doesn't
+  ;; understand that an ace can be either the lowest,
+  ;; or highest card, depending.
   (sort card-comp hand))
 
 (defn card-present? [hand card]
@@ -70,10 +73,20 @@
 (sort-hand [[:eight :clubs] [:four :clubs] [:ace :hearts] [:jack :diamonds] [:eight :spades]])
 ;; => ([:ace :hearts] [:jack :diamonds] [:eight :clubs] [:eight :spades] [:four :clubs])
 
+
+;;;; Some example hands
+
+(def nuthin-hand
+  "A hand that I typically get."
+  [[:eight :clubs] [:four :clubs] [:ten :hearts] [:jack :diamonds] [:two :spades]])
 
 (def two-of-a-kind-hand
   "A pair of eights."
   [[:eight :clubs] [:four :clubs] [:ten :hearts] [:jack :diamonds] [:eight :spades]])
+
+(def two-pairs-hand
+  "A hand with a pair of eights and a pair of tens."
+  [[:eight :clubs] [:four :clubs] [:ten :hearts] [:ten :diamonds] [:eight :spades]])
 
 (def three-of-a-kind-hand
   "A triple of eights."
@@ -103,6 +116,11 @@
   "A flush hand, ace high."
   [[:eight :clubs] [:four :clubs] [:jack :clubs] [:ace :clubs] [:three :clubs]])
 
+(def straight-flush-hand
+  "A straight flush, five high"
+  [[:two :clubs] [:four :clubs] [:five :clubs] [:ace :clubs] [:three :clubs]])
+
+
 
 ;;;; Utilities
 
@@ -112,62 +130,49 @@
   [& clauses]
   ;; There is no run-1 in core.logic, and having to
   ;; intersperse (first ...) everywhere is annoying.
-  `(first (l/run 1 ~@clauses)))
+  `(first (run 1 ~@clauses)))
+
+;; Turns out I don't need these, but they might
+;; be nice to explain.
+
+(defn twinso [s]
+  (fresh [x y]
+    (conso x [y] s)
+    (== x y)))
+
+(defn threeo [s]
+  (fresh [a b c]
+    (conso a [b c] s)
+    (== a b)
+    (== a c)))
 
 
-;;;; Hand classification
+;;;; Hand classifications --- First attempt
 
 (defn two-of-a-kind?
-  "Return the value of the rank of a three of a kind hand, or nil."
   [hand]
-  (run-1 [rank]
-    (fresh [suit-1 suit-2 c suit-3 d suit-4 e suit-5]
-      (l/membero [rank suit-1] hand)
-      (l/membero [rank suit-2] hand)
-      (l/membero [c suit-3] hand)
-      (l/membero [d suit-4] hand)
-      (l/membero [e suit-5] hand)
-      (l/distincto [rank c d e])
-      (l/distincto [suit-1 suit-2]))))
+  (let [ranks (map card-rank hand)]
+    (run-1 [a a c d e]
+      (permuteo [a a c d e] ranks)
+      (distincto [a c d e]))))
 
-
-(defn three-of-a-kind?
-  "Return the value of the rank of a three of a kind hand, or nil."
+;; Get rid of the (map card-rank hand),
+;; and try to generalize to a pattern which might
+;; work on any hand
+;;
+(defn two-of-a-kind?
   [hand]
-  (run-1 [rank]
-    (fresh [a b c]
-     (l/membero [rank a] hand)
-     (l/membero [rank b] hand)
-     (l/membero [rank c] hand)
-     (l/distincto [a b c]))))
+  (run-1 [q]
+    (fresh [a b c d e  ; ranks
+            r s t u v] ; suites
+      (== q [[a r] [b s] [c t] [d u] [e v]]) ; Answer looks like the full hand.
+      (permuteo [[a r] [a s] [c t] [d u] [e v]] hand)
+      ;; And, redundant, but binding `b' allows us to get
+      ;; what looks like a hand, instead of just a fresh val.
+      (== a b)
+      (distincto [a c d e]))))
 
-(defn four-of-a-kind?
-  "Return the value of the rank of a four of a kind hand, or nil."
-  [hand]
-  (run-1 [rank]
-    (fresh [a b c d]                  ; a,b,c,d are suits.
-      (membero [rank a] hand)
-      (membero [rank b] hand)
-      (membero [rank c] hand)
-      (membero [rank d] hand)
-      (distincto [a b c d]))))
-
-(defn full-house?
-  "Returns a vector of [triple pair] if HAND is a full house, otherwise nil."
-  [hand]
-  (run-1 [hi lo]
-    (fresh [a b c d e]
-      (membero [hi a] hand)
-      (membero [hi b] hand)
-      (membero [hi c] hand)
-
-      (membero [lo d] hand)
-      (membero [lo e] hand)
-
-      (distincto [hi lo])
-      (distincto [a b c])
-      (distincto [d e]))))
-
+;; Again, a sort of "bespoke", crafted solution.
 (defn flush?
   "Returns the value of highest ranked card suit if HAND is a flush, otherwise nil."
   [hand]
@@ -177,6 +182,93 @@
           (== [suite suite suite suite suite] suites))
       (card-rank (first hand)))))
 
+(defn high-card?
+  ;; FIXME.
+  ;; This is actually hard!  how to distinguish from a flush or straight?
+  ;; One way is to cheat and never call this, and have the "fallthrough" case
+  ;; be the obvious, high-card? hand.
+  [hand]
+  (run-1 [rank]
+    (fresh [a b c d e]
+      (distincto [a b c d e]))))
+
+
+;;;; A poker specific helper macro
+
+(defmacro define-poker-pred
+  "Define a new type of poke predicate named NAME.
+   CLAUSES are any numberof forms suitable to be embedded
+   in the run* macro.
+
+   Macro is unhygienic, and capture the following symbols:
+   (a b c d e) and (r s t u v), where the a,b,... are the ranks
+   of the cards, and the r,s... are the suits of those cards.
+
+   The inference is run, and returns either nil, if no match is found,
+   or what looks like the matched hand, i.e.
+   [[a r] [b s] ...]
+
+   Note that you should ensure that all conditions necessary are met
+   so that you do not return unbound (i.e. fresh) symbols, but rather
+   a valid permutation of the input hand.
+
+   Functions defined with this macro can then be used thusly:
+   (define-poker-pred has-pair? (== a b))
+   (has-pair [[:b 1] [:c 2] [:b 3] [:d 1] [:e 4]))
+   ==> [[:b 3] [:b 1] [:c 2] [:d 1] [:e 4]]"
+  [name & clauses]
+  `(defn ~name
+     [hand#]
+     (run-1 [q#]
+       (fresh [~'a ~'b ~'c ~'d ~'e ~' r ~'s ~'t ~'u ~'v]
+         ;; Try every permutation of the hand into the available lvars
+         (permuteo [[~'a ~'r] [~'b ~'s] [~'c ~'t] [~'d ~'u] [~'e ~'v]] hand#) ; Answer looks like the full hand.
+         (== q# [[~'a ~'r] [~'b ~'s] [~'c ~'t] [~'d ~'u] [~'e ~'v]])
+         ~@clauses))))
+
+
+
+;;;; Armed with define-poker-pred, we can now rewrite our predicates a bit more clearly:
+
+(define-poker-pred two-of-a-kind?
+  (== a b)
+  (distincto [a c d e]))
+
+(two-of-a-kind? two-of-a-kind-hand)
+(two-of-a-kind? two-pairs-hand)
+
+(define-poker-pred two-pairs-hand?
+  (== a b)
+  (== c d)
+  (distincto [a c]))
+
+
+(define-poker-pred three-of-a-kind?
+  [hand]
+  (== a b) (== a c) ; and (== b c) is redundant
+  (distincto [a d e])) ; Can't have [d e] be the same --- that's a full house!
+
+(define-poker-pred full-house?
+  ;; Note, there is no need to check for (distinct [a d])
+  ;; as there cannot be 5 cars of the same rank in a hand (under these rules).
+  (== a b) (== a c) ; and (== b c) is redundant
+  (== d e))
+
+(define-poker-pred flush?
+  ;; A hand is flush if the 2nd, third card etc all
+  ;; have the same suite as the first one.
+  (everyg #(== r %) [s t u v]))
+
+(define-poker-pred four-of-a-kind?
+  ;; n.b. since four-of-a-kind is higher than a straight,
+  ;; we don't need to check to see if the suites differ.  (I think)
+  (== a b)
+  (== a c)
+  (== a d))
+
+
+;; The straight is tricky, so I simply enumerate every possibility:
+
 (def all-possible-straights
   (let [all (concat [:ace] ranks)]
     (for [n (range 10)]
@@ -184,51 +276,88 @@
             (->> all
                  (drop n)
                  (take 5))))))
-(defn straight?
-  "Returns the value of highest ranked card suit if HAND is a flush, otherwise nil.
-  :ace is returned if it is in the \"highest\" position, i.e. above :king, but not
-  if it is in the \"lowest\" position, i.e. below :two "
-  [hand]
-  (let [ranks (map card-rank hand)] ; No need to recompute this every time.
-    (run-1 [e] ; The last card in the straight
-      (fresh [a b c d] ; The 4 lowest cards.
-        ;; Remember, whatever gets bund to E will have the highest rank,
-        ;; because it will be rightmost.  This takes care of the Ace being
-        ;; lowest/highest.
-        (l/permuteo [a b c d e] ranks)
-        (l/membero [a b c d e] all-possible-straights)))))
+
+;; =>> ([:ace :two :three :four :five] [:two :three :four :five :six]
+;;      [:three :four :five :six :seven] [:four :five :six :seven :eight] ... etc
+;;      [:ten :jack :queen :king :ace])
+;; Note that the :ace can be either highest or lowest!
+
+;; And with that, it becomes trivial:
+
+(define-poker-pred straight?
+  (membero [a b c d e] all-possible-straights))
+
+(define-poker-pred straight-flush?
+  (membero [a b c d e] all-possible-straights)
+  (everyg #(== r %) [s t u v]))
+
+
+
+;;;; Hand validation
+
+(define-poker-pred valid?
+  ;; Every rank and suite is valid
+  (everyg #(membero % ranks) [a b c d e])
+  (everyg #(membero % suites) [r s t u v])
+  ;; And we have no duplicate cards
+  (distincto [[a r] [b s] [c t] [d u] [e v]]))
+
+
+
+;;;; Tests
+(defn- check [pred hand]
+  (assert (pred hand)))
+
+(defn- check-not [pred hand]
+  (assert (not (pred hand))))
+
+(def all-preds
+  {[:straight-flush   straight-flush?]
+   [:four-of-a-kind   four-of-a-kind?]
+   [:full-house       full-house?]
+   [:flush            flush?]
+   [:three-of-a-kind  three-of-a-kind?]
+   [:two-of-a-kind    two-of-a-kind?]
+   [:two-pairs-hand   two-pairs-hand?]})
 
 
 
-(comment                                ; Some simple tests
+(defn categorize [hand]
+  (or (first
+       (filter
+        (fn [[name pred]]
+          (when (pred hand)
+            [name hand]))
+        all-preds))
+      [:high-card hand]))
 
-  (two-of-a-kind? two-of-a-kind-hand)
-  (two-of-a-kind? three-of-a-kind-hand)
-
-  (two-of-a-kind test-hand)
-  (two-of-a-kind (first (draw (shuffle deck) 5)))
-
-  (two-of-a-kind
-   [[:ten :spades] [:jack :spades] [:eight :hearts] [:three :hearts] [:ace :hearts]])
+(categorize straight-hand) ; WRONG! you were here
+[:high-card [[:two :diamonds] [:four :clubs] [:five :spades] [:ace :clubs] [:three :clubs]]]
 
 
-  (nil? (full-house four-of-a-kind-hand))
+(time
+ (do
+   (check valid? nuthin-hand)
 
-  (= [:ten :jack]
-     (full-house [[:ten :spades] [:jack :spades] [:jack :hearts] [:ten :clubs] [:ten :diamonds]]))
+   ;; Nothing matchtes the nuthin-hand:
+   (doseq [[_ p] all-preds]
+     (check-not p nuthin-hand))
 
-  ;; Order doesn't matter
-  (= [:ten :jack]
-     (full-house
-      (shuffle
-       [[:ten :spades] [:jack :spades] [:jack :hearts] [:ten :clubs] [:ten :diamonds]])))
+   (check two-of-a-kind? two-of-a-kind-hand)
+   (check-not two-of-a-kind? three-of-a-kind?)
 
-  (two-of-a-kind two-of-a-kind-hand)
-  (three-of-a-kind three-of-a-kind-hand)
-  (four-of-a-kind four-of-a-kind-hand)
-  (full-house full-house-hand)
+   (check three-of-a-kind? three-of-a-kind-hand)
+   (check-not three-of-a-kind? full-house-hand)
 
-  (= :ace (flush flush-hand)))
+   (check full-house? full-house-hand)
+   (check straight? straight-hand)
+   (check flush? flush-hand)))
+
+
+
+
+
+
 
 
 (defn categorize-hand [hand]
@@ -317,7 +446,7 @@
 
 ;;;; Other experiments below
 
-(l/defne my-membero
+(defne my-membero
   "A relation where l is a collection, such that l contains x."
   [x l]
   ([_ [x . tail]])
@@ -331,7 +460,7 @@
   [hand suite high]
   (let [hand (sort-hand hand)
         suites (map card-suite hand)] ; If we match, the first card will be the highest in the suit.
-    (l/and*
+    (and*
      [(== high (card-rank (first hand)))
       (== [suite suite suite suite suite] suites)])))
 
