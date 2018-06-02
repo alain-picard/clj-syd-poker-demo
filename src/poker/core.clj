@@ -120,6 +120,10 @@
   "A straight flush, five high"
   [[:two :clubs] [:four :clubs] [:five :clubs] [:ace :clubs] [:three :clubs]])
 
+(def all-test-hands
+  '[nuthin-hand two-of-a-kind-hand two-pairs-hand three-of-a-kind-hand straight-hand
+   four-of-a-kind-hand full-house-hand high-full-house-hand flush-hand high-flush-hand
+   straight-flush-hand])
 
 
 ;;;; Utilities
@@ -190,6 +194,7 @@
   [hand]
   (run-1 [rank]
     (fresh [a b c d e]
+
       (distincto [a b c d e]))))
 
 
@@ -237,11 +242,10 @@
 (two-of-a-kind? two-of-a-kind-hand)
 (two-of-a-kind? two-pairs-hand)
 
-(define-poker-pred two-pairs-hand?
+(define-poker-pred two-pairs?
   (== a b)
   (== c d)
   (distincto [a c]))
-
 
 (define-poker-pred three-of-a-kind?
   [hand]
@@ -265,7 +269,6 @@
   (== a b)
   (== a c)
   (== a d))
-
 
 ;; The straight is tricky, so I simply enumerate every possibility:
 
@@ -291,6 +294,30 @@
   (membero [a b c d e] all-possible-straights)
   (everyg #(== r %) [s t u v]))
 
+(defn some-distinct? [l]
+  (cond
+    (empty? l)  nil
+    :else (let [[h & r] l]
+            (not (empty? (filter #(not= h %) r))))))
+
+(defn some-distincto
+  "A relation in which some elements are distinct
+   i.e. not all elements are the same."
+  [l]
+  (fresh [h t]
+    (conso h t l)
+    (conda                              ; Explain conda
+     [(everyg #(== h %) t) u#]
+     [s# s#])))
+
+(define-poker-pred high-card?
+  (distincto [a b c d e])
+  (some-distincto [r s t u v]))
+
+(high-card? flush-hand)
+(high-card? nuthin-hand)
+
+
 
 
 ;;;; Hand validation
@@ -312,27 +339,49 @@
   (assert (not (pred hand))))
 
 (def all-preds
-  {[:straight-flush   straight-flush?]
+  [[:straight-flush   straight-flush?]
    [:four-of-a-kind   four-of-a-kind?]
    [:full-house       full-house?]
    [:flush            flush?]
+   [:straight         straight?]
    [:three-of-a-kind  three-of-a-kind?]
    [:two-of-a-kind    two-of-a-kind?]
-   [:two-pairs-hand   two-pairs-hand?]})
-
-
+   [:two-pairs-hand   two-pairs?]
+   [:high-card        high-card?]])
 
 (defn categorize [hand]
-  (or (first
-       (filter
-        (fn [[name pred]]
-          (when (pred hand)
-            [name hand]))
-        all-preds))
-      [:high-card hand]))
+  (first (filter identity
+                 (map (fn [[name p]] (when (p hand) [name hand]))
+                      all-preds))))
 
-(categorize straight-hand) ; WRONG! you were here
-[:high-card [[:two :diamonds] [:four :clubs] [:five :spades] [:ace :clubs] [:three :clubs]]]
+(defn categorize [hand]
+  (->> all-preds
+       (map (fn [[name p]] (when (p hand) [name hand])))
+       (filter identity)
+       (first)))
+
+
+(def results
+  (for [h all-test-hands]
+    [h (categorize (eval h))]))
+
+#_
+(let [s (rand-nth all-test-hands)
+      h (eval s)]
+  (println s)
+  (println h)
+ (categorize  h))
+
+
+(def results (atom {}))
+
+(comment
+  (dotimes [i 50]
+    (let [[cat h] (categorize (first (draw (shuffle deck) 5)))]
+      (assert cat (str "unable to categorize" h))
+      (swap! results update cat (fnil inc 0)))
+    (println i)))
+
 
 
 (time

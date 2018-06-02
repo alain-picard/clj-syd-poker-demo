@@ -61,13 +61,17 @@
     (== a b)
     (== a c)))
 
-(run* [a a c d e] ; two distinct pairs
-  (permuteo [a a c d e] [:a :e :a :d :c])
+(run* [a b c d e] ; two distinct pairs
+  (permuteo [a b c d e] [:a :e :a :d :e])
+  (twinso [a b])
+  (twinso [c d])
+  (distincto [a c]))
 
-  ;; (twinso [a b])
-  ;; (twinso [d e])
-  (distincto [a c d e])
-  )
+(run* [a b c d e] ; full house
+  (permuteo [a b c d e] [:a :e :a :a :e])
+  (threeo [a b c])
+  (twinso [d e]))
+
 
 (run 1 [q]
   (fresh [a b c d]
@@ -134,3 +138,141 @@
     (membero x '(d b))
     (membero y '(d b))
     (conso 'a `(c e ~x ~y) q)))
+
+
+(run* [q]
+  (fresh [a b c d x y]
+    ;; [:spades :clubs :clubs  :clubs    :clubs]
+    (permuteo [a b c d] [:spades :clubs :hearts :diamonds :clubs])
+    (== [x y] [a b])
+    (conde
+     [(== x y) u#]
+     [u#       s#])))
+
+(let [suites
+      [:spades :clubs :hearts :diamonds :clubs]
+;      [:clubs :clubs :hearts :diamonds :clubs]
+;     [:clubs :clubs :hearts :clubs :clubs]
+;      [:clubs :clubs :clubs :clubs :clubs]
+      ]
+  (run 1 [q]
+    (fresh [a b r r2 perms]
+      (conso a r suites)
+      (membero b r)
+      (!= a b)
+      (== q [a b]))))
+
+
+;; distincto eventually macroexpands to this:
+(fn [l]
+  (conde
+    ((fresh [] (== () l)))
+    ((fresh [h] (== [h] l)))
+    ((fresh
+       [t h1 h0]
+       (== (llist h0 h1 t) l)
+       (!= h0 h1)
+       (distincto (lcons h0 t))
+       (distincto (lcons h1 t))))))
+
+(defn mydistincto [l]
+  (conde
+   ((fresh [] (== () l)))
+   ((fresh [h]
+      (== [h] l)
+      (trace-lvars "ONE" h)))
+   ((fresh [t h1 h0]
+      (== (llist h0 h1 t) l)
+      (trace-lvars "foo" h0 h1 t)
+      (!= h0 h1)
+      (mydistincto (lcons h0 t))
+      (mydistincto (lcons h1 t))))))
+
+(let [s [:a :b :clubs :clubs2 :clubs]]
+  (run* [a b c d e]
+    (== [a b c d e] s)
+    (some-distincto [a b c d e])))
+
+(defn member? [a l]
+  (cond
+    (empty? l) nil
+    (= a (first l)) l
+    :else (member? a (rest l))))
+
+(filter #(not= :a %) [:a :b :a :a :a])
+
+(defn some-distinct? [l]
+  (cond
+    (empty? l)  nil
+    :else (let [[h & r] l]
+            (not (empty? (filter #(not= h %) r))))))
+
+(some-distinct? [:a :a :a :b :a])
+
+(rembero)
+
+
+(defn some-distincto [l]
+  (conde
+   ;; ((fresh [] (== () l) u#))
+    ;; ((fresh [h] (== [h] l) u#))
+   ((fresh [a b]
+      (!= a b)
+      (== [a b] l)
+      (trace-lvars "TWO" a b l)
+      ))                        ;  success!
+   ((fresh [t h1 h0]
+      ;; More than 2 entries:
+      (== (llist h0 h1 t) l)
+      (trace-lvars "foo" h0 h1 t l)
+      ;; Try it on each possible sublist.
+      (some-distincto (lcons h0 t))
+      (some-distincto (lcons h1 t))))))
+
+
+(defn not-all-equal?
+  "A relation testing if s contains any distinct elements"
+  [s]
+  (run 1 [q]
+    (fresh [a b r r2 perms]
+      (conso a r suites)
+      (membero b r)
+      (!= a b)
+      (== q [a b]))))
+
+
+;;; How to generate every inner subpair?
+;;; e.g. result here should be
+;;; [ [spades clubs] [clubs hearts] [hearts diamonds] [diamonds clubs] ]
+(let [suites [:spades :clubs :hearts :diamonds :clubs]]
+  (run* [pair]
+    (fresh [a b r]
+;      (== pair [a b])
+      (appendo pair r suites)
+      )))
+
+(defn some-distincto [l]
+  (fresh [h t]
+    (conso h t l)
+    (trace-lvars "DIST" h t l)
+    (conda
+     [(everyg #(== h %) t) u#]
+     [s# s#])))
+
+(let [suites
+      ;; [:spades :clubs :hearts :diamonds :clubs]
+      ;; [:spades :spades :spades :spades :spades]
+      ;; [:spades :spades :spades :spades :heart]
+      [:spades :spades :spades :spades ]
+      ]
+  (run 5 [r s t u v]
+    (== suites [r s t u])
+    (membero v [:clubs :hearts])
+    (some-distincto [v r s t u])
+    ))
+
+(run* [q]
+  (fresh [x y]
+    (== x :a)
+    (== y :a)
+    (!= x y)))
