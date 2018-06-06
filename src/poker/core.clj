@@ -1,8 +1,7 @@
 (ns poker.core
   (:refer-clojure :exclude [==])
-  (:require
-   [clojure.math.combinatorics :as comb :refer [combinations]]
-   [clojure.core.logic :refer :all]))
+  (:require [clojure.core.logic :refer :all])
+  (:require [poker.ranking :refer [winner]]))
 
 
 ;;;;  Card Abstract data types.
@@ -248,7 +247,6 @@
   (distincto [a c]))
 
 (define-poker-pred three-of-a-kind?
-  [hand]
   (== a b) (== a c) ; and (== b c) is redundant
   (distincto [a d e])) ; Can't have [d e] be the same --- that's a full house!
 
@@ -345,22 +343,19 @@
    [:flush            flush?]
    [:straight         straight?]
    [:three-of-a-kind  three-of-a-kind?]
-   [:two-of-a-kind    two-of-a-kind?]
-   [:two-pairs-hand   two-pairs?]
+   [:pair    two-of-a-kind?]
+   [:two-pairs        two-pairs?]
    [:high-card        high-card?]])
 
-(defn categorize [hand]
-  (first (filter identity
-                 (map (fn [[name p]] (when (p hand) [name hand]))
-                      all-preds))))
 
+;; FIXME: Rewrite this with minikanren.
 (defn categorize [hand]
   (->> all-preds
        (map (fn [[name p]] (when (p hand) [name hand])))
        (filter identity)
        (first)))
 
-
+#_
 (def results
   (for [h all-test-hands]
     [h (categorize (eval h))]))
@@ -383,7 +378,16 @@
     (println i)))
 
 
+(let [[l r] (draw-two-poker-hands)
+      [lcat lh] (categorize l)
+      [rcat rh] (categorize r)]
+  (println [lcat lh])
+  (println [rcat rh])
+  (winner [:alice lcat]
+          [:bob   rcat]))
 
+
+#_
 (time
  (do
    (check valid? nuthin-hand)
@@ -403,119 +407,11 @@
    (check flush? flush-hand)))
 
 
-
-
-
 
 
-
-(defn categorize-hand [hand]
-  (condp #(%1 %2) hand
-    two-of-a-kind?     :>> #(vector :pair %)
-    full-house?        :>> #(vector :full-house %)
-    four-of-a-kind?    :>> #(vector :four-of-a-kind %)
-    three-of-a-kind?   :>> #(vector :three-of-a-kind %)
-    ;; FIXME: Needs the "busted" hand.
-    ))
-
-(def sorted-rules
-  [four-of-a-kind? full-house? three-of-a-kind? two-of-a-kind?])
-
-(let [hand three-of-a-kind-hand]
- (map #(% hand) sorted-rules))
-
-(categorize-hand full-house-hand)
-(categorize-hand four-of-a-kind-hand)
-(categorize-hand three-of-a-kind-hand)
 
 (comment
   (map sort-hand
        (draw-two-poker-hands))
   (([:jack :diamonds] [:nine :spades] [:nine :diamonds] [:six :clubs] [:five :diamonds])
    ([:jack :clubs] [:ten :clubs] [:nine :clubs] [:three :hearts] [:three :diamonds])))
-
-
-;;;;  Poker rules
-
-(def winning-order
-  [:high-card                           ; FIXME: tbd
-   :pair
-   :two-pairs                           ; FIXME: tbd
-   :three-of-a-kind
-   :straight
-   :flush
-   :full-house
-   :four-of-a-kind
-   :straight-flush])                    ; FIXME: tbd
-
-
-;; How do we compare hands?
-(defn wins?
-  "Returns the winning hand (or both, if a tie)"
-  [left right] ; These are hand classifications.
-  (let [l (.indexOf winning-order left)
-        r (.indexOf winning-order right)]
-    (cond
-      (< l r) right
-      (> l r) left
-      :else   [left right])))
-
-(defn wins? [left right]
-  (first
-   (drop-while nil?
-               (mapcat
-                (fn [w]
-                  (conj
-                   []
-                   (when (= w right)
-                     [:winner :right right])
-                   (when (= w left)
-                     [:winner :left left])))
-                (reverse winning-order)))))
-
-(defn wins? [left right]
-  ;; None of this takes care of ties within hands;
-  ;; e.g. two hands with a pair, highest pair wins.
-  ;; FIXME.
-  (when (not= left right) ; Ties get reported as nil.
-    (->> (mapcat (fn [w] (conj []
-                               (when (= w right)
-                                 [:right right])
-                               (when (= w left)
-                                 [:left left])))
-                 (reverse winning-order))
-         ;; The first one to have been able to place
-         ;; his entry on the list is the winner!
-         (drop-while nil?)
-         first)))
-
-(let [[position hand] (wins? :straight :flush)]
-  position)
-
-
-;;;; Other experiments below
-
-(defne my-membero
-  "A relation where l is a collection, such that l contains x."
-  [x l]
-  ([_ [x . tail]])
-  ([_ [head . tail]]
-    (my-membero x tail)))
-
-
-(defn flusho
-  "Returns the value of highest ranked card suit if HAND is a flush, otherwise nil."
-  ;; This is not a real relation, because it cannot infer hand if passed suite, high.
-  [hand suite high]
-  (let [hand (sort-hand hand)
-        suites (map card-suite hand)] ; If we match, the first card will be the highest in the suit.
-    (and*
-     [(== high (card-rank (first hand)))
-      (== [suite suite suite suite suite] suites)])))
-
-(let [hand flush-hand #_ test-hand]
-  (run* [s hi]
-    (flusho hand s hi)))
-
-
-(time (straight? straight-hand))

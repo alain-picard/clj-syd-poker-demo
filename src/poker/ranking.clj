@@ -11,19 +11,23 @@
 
 (def poker-rules
   (db/db
+   [hand :straight-flush]
+   [hand :four-of-a-kind]
    [hand :flush]                        ; These are all our hands
    [hand :straight]
    [hand :three-of-a-kind]
    [hand :two-pairs]
    [hand :pair]
-   [hand :high-hand]
+   [hand :high-card]
 
-   [beats :straight :flush]             ; And this is who beats what.
-   [beats :flush :full-house]           ; Hope I didn't make a mistake
-   [beats :full-house :three-of-a-kind] ; in copying the rules.  :-)
+   [beats :straight-flush :four-of-a-kind]
+   [beats :four-of-a-kind :full-house]
+   [beats :full-house :flush]           ; Hope I didn't make a mistake
+   [beats :flush :straight]             ; And this is who beats what.
+   [beats :straight :three-of-a-kind] ; in copying the rules.  :-)
    [beats :three-of-a-kind :two-pairs]
    [beats :two-pairs :pair]
-   [beats :pair :high-hand]))
+   [beats :pair :high-card]))
 
 
 (db/with-db  poker-rules
@@ -32,7 +36,7 @@
 
 (db/with-db  poker-rules
   (run* [who]                           ; a :high-hand beats nobody
-    (beats :high-hand who)))
+    (beats :high-card who)))
 
 (db/with-db  poker-rules                ; nobody beats a straight
   (run* [who]
