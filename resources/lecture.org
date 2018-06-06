@@ -1,0 +1,41 @@
+#+TITLE:  Playing Poker with =core.logic=
+#+AUTHOR:    Alain Picard
+#+EMAIL:     alain.picard@insightdatasolutions.com.au 
+#+REVEAL_THEME: solarized
+#+REVEAL_TRANS: none
+#+REVEAL_EXTRA_CSS: prezzo.css
+#+OPTIONS: num:nil
+#+OPTIONS: org_reveal_title_slide:nil
+
+
+* Playing Poker with =core.logic=
+    by
+
+#+REVEAL_HTML: <h3> Alain Picard </h3>
+#+REVEAL_HTML: <h4> CLJ-SYD June 2018 </h4>
+
+
+* Motivation
+
+* miniKanren
+
+** [[file:reasoned-schemer-cover.jpg]]
+
+** A great talk:
+ 
+  [[https://www.youtube.com/watch?v=OyfBQmvr2Hc][William Byrd on "The Most Beautiful Program Ever Written" {PWL NYC} - YouTube]]
+
+
+
+
+* Logic programming
+
+Basic idea: Programmer describes the problem.  Computer finds the solution.
+
+Read about =PROLOG= for historical background.
+
+
+
+* =core.logic=
+
+** 
