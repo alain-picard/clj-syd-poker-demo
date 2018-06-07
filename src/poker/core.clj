@@ -135,19 +135,7 @@
   ;; intersperse (first ...) everywhere is annoying.
   `(first (run 1 ~@clauses)))
 
-;; Turns out I don't need these, but they might
-;; be nice to explain.
 
-(defn twinso [s]
-  (fresh [x y]
-    (conso x [y] s)
-    (== x y)))
-
-(defn threeo [s]
-  (fresh [a b c]
-    (conso a [b c] s)
-    (== a b)
-    (== a c)))
 
 
 ;;;; Hand classifications --- First attempt
@@ -185,23 +173,14 @@
           (== [suite suite suite suite suite] suites))
       (card-rank (first hand)))))
 
-(defn high-card?
-  ;; FIXME.
-  ;; This is actually hard!  how to distinguish from a flush or straight?
-  ;; One way is to cheat and never call this, and have the "fallthrough" case
-  ;; be the obvious, high-card? hand.
-  [hand]
-  (run-1 [rank]
-    (fresh [a b c d e]
 
-      (distincto [a b c d e]))))
 
 
 ;;;; A poker specific helper macro
 
 (defmacro define-poker-pred
   "Define a new type of poke predicate named NAME.
-   CLAUSES are any numberof forms suitable to be embedded
+   CLAUSES are any number of forms suitable to be embedded
    in the run* macro.
 
    Macro is unhygienic, and capture the following symbols:
@@ -259,15 +238,16 @@
 (define-poker-pred flush?
   ;; A hand is flush if the 2nd, third card etc all
   ;; have the same suite as the first one.
+  ;; (actually, this is buggy... because a straight-flush should get matched.
+  ;;  More on that below.)
   (everyg #(== r %) [s t u v]))
 
 (define-poker-pred four-of-a-kind?
-  ;; n.b. since four-of-a-kind is higher than a straight,
-  ;; we don't need to check to see if the suites differ.  (I think)
   (== a b)
   (== a c)
   (== a d))
 
+
 ;; The straight is tricky, so I simply enumerate every possibility:
 
 (def all-possible-straights
@@ -292,11 +272,19 @@
   (membero [a b c d e] all-possible-straights)
   (everyg #(== r %) [s t u v]))
 
-(defn some-distinct? [l]
-  (cond
-    (empty? l)  nil
-    :else (let [[h & r] l]
-            (not (empty? (filter #(not= h %) r))))))
+(define-poker-pred flush?
+  ;; Now we know how to fix our broken flush? function:
+  ;; Add condition that we are not a straight:
+  (nilo (membero [a b c d e] all-possible-straights))
+  (everyg #(== r %) [s t u v]))
+
+(flush? straight-flush-hand)
+(straight-flush? straight-flush-hand)
+
+
+;;; The high-card hand is also tricky; we need a predicate
+;;; which tells us that at least two elements of a sequence
+;;; are distinct.
 
 (defn some-distincto
   "A relation in which some elements are distinct
@@ -308,12 +296,14 @@
      [(everyg #(== h %) t) u#]
      [s# s#])))
 
+
 (define-poker-pred high-card?
-  (distincto [a b c d e])
-  (some-distincto [r s t u v]))
+  (distincto [a b c d e])               ; All values are different
+  (some-distincto [r s t u v]))         ; But not a flush.
 
 (high-card? flush-hand)
 (high-card? nuthin-hand)
+
 
 
 

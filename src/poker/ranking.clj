@@ -9,6 +9,9 @@
 ;; This define a fact called "beats"; i.e. enumerate the order in which hands are sorted.
 (db/db-rel beats left right)
 
+
+;;; This is how we teach core.logic about the rules of poker
+
 (def poker-rules
   (db/db
    [hand :straight-flush]
@@ -41,7 +44,7 @@
 (db/with-db  poker-rules                ; nobody beats a straight
   (run* [who]
     (beats who :straight)))
-
+
 
 (defn bettero
   "A relation returning all hands capable of beating HAND."
@@ -56,29 +59,37 @@
 (db/with-db  poker-rules
   (run* [winner]
      ;; Should return all hands which can beat :three-of-a-kind
-     (bettero :two-pairs winner)))
+     (bettero :three-of-a-kind winner)))
 
 
-(defn winner [player-left player-right]
+
+;;; Finally -- our poker hand evaluator!
+
+(defn winner
+  "Compare the hands of two \"players\", each of which is a pair
+   of [player-name poker-hand].  Returns a map indicating the winner and loser
+   (or nil, in case of a draw)
+
+   This does NOT handle ranking players by highest card if they have equal types
+   of hands---don't base your gambling start-up off of this code!!!"
+  [player-left player-right]
   (db/with-db poker-rules
     (run* [q]
-      (fresh [losing-hand loser-name
-              winning-hand winner-name]
-        (bettero losing-hand winning-hand)
-        (conde
-         ;; We have 2 cases; either the winning player
-         ;; is player-right, or he's player-left.
+      (fresh [losing-hand loser-name winning-hand winner-name loser winner]
+        (bettero losing-hand winning-hand) ; Enumerates all pairs of which hand beats which
+        (== loser  [loser-name losing-hand])   ; loser, winner are just helper vars for clarity
+        (== winner [winner-name winning-hand])
+        (conde ; We have 2 cases; either the winning player is player-right, or he's player-left.
+         [(all (== winner player-right)
+               (== loser  player-left)
+               (== q {:winner player-right
+                      :loser player-left})) s#]
+         [(all (== winner player-left)           ; Winning player is player-left
+               (== loser  player-right)
+               (== q {:winner player-left
+                      :loser player-right})) s#])))))
 
-         ;; Winning player is player-right
-         [(all (== [loser-name losing-hand]   player-left)
-               (== [winner-name winning-hand] player-right)
-               (== q {:winner player-right  :loser player-left})) s#]
-
-         ;; Winning player is player-left
-         [(all (== [loser-name losing-hand]   player-right)
-               (== [winner-name winning-hand] player-left)
-               (== q {:winner player-left  :loser player-right})) s#])))))
 
 (winner [:bob :two-pairs] [:alice :flush])
 (winner [:bob :three-of-a-kind] [:alice :two-pairs])
-(winner [:bob :two-pairs] [:alice :two-pairs])   ; This case is not yet handled.
+(winner [:bob :two-pairs] [:alice :two-pairs])
