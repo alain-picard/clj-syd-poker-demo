@@ -136,7 +136,6 @@
   `(first (run 1 ~@clauses)))
 
 
-
 
 ;;;; Hand classifications --- First attempt
 
@@ -183,9 +182,9 @@
    CLAUSES are any number of forms suitable to be embedded
    in the run* macro.
 
-   Macro is unhygienic, and capture the following symbols:
-   (a b c d e) and (r s t u v), where the a,b,... are the ranks
-   of the cards, and the r,s... are the suits of those cards.
+   Macro is (purposefully) unhygienic, and capture the following symbols:
+   (a b c d e) and (r s t u v), where the a,b,... are the RANKS
+   of the cards, and the r,s... are the SUITS of those cards.
 
    The inference is run, and returns either nil, if no match is found,
    or what looks like the matched hand, i.e.
@@ -223,7 +222,7 @@
 (define-poker-pred two-pairs?
   (== a b)
   (== c d)
-  (distincto [a c]))
+  (distincto [a c e]))
 
 (define-poker-pred three-of-a-kind?
   (== a b) (== a c) ; and (== b c) is redundant
@@ -235,17 +234,37 @@
   (== a b) (== a c) ; and (== b c) is redundant
   (== d e))
 
-(define-poker-pred flush?
-  ;; A hand is flush if the 2nd, third card etc all
-  ;; have the same suite as the first one.
-  ;; (actually, this is buggy... because a straight-flush should get matched.
-  ;;  More on that below.)
-  (everyg #(== r %) [s t u v]))
-
 (define-poker-pred four-of-a-kind?
   (== a b)
   (== a c)
   (== a d))
+
+
+
+(defn flusho
+  "A goal which succeeds when the specified suits constitute a flush."
+  [r s t u v]
+  (everyg #(== r %) [s t u v]))
+
+
+(defmacro not-a [goal]
+  `(conda                               ; Terrible hack.  Even experts agree.
+    [~goal fail]
+    [succeed]))
+
+
+(defn not-a-flusho
+  "A goal which succeeds when the specified suits do NOT constitute a flush."
+  [r s t u v]
+  (not-a (flusho r s t u v)))
+
+
+(define-poker-pred flush?
+  ;; A hand is flush if the 2nd, third card etc all
+  ;; have the same suite as the first one.
+  ;; (actually, this is buggy... because a straight-flush should not get matched.
+  ;;  More on that below.)
+  (flusho r s t u v))
 
 
 ;; The straight is tricky, so I simply enumerate every possibility:
@@ -263,49 +282,82 @@
 ;;      [:ten :jack :queen :king :ace])
 ;; Note that the :ace can be either highest or lowest!
 
+(defn straighto
+  "A goal which succeeds when the card values form a straight"
+  [a b c d e]
+  (fresh [x y z q r]
+    (permuteo [x y z q r] [a b c d e])
+    (membero [x y z q r] all-possible-straights)))
+
+;; Example - we can ask what card could be the missing to constitute a straight?
+(run* [a b c missing e]
+  (== [a b c missing e]  [:two :four :five missing :three])
+  (straighto a b c missing e))
+
+
+;; And we'll need the converse
+
+(defn not-a-straighto
+  "A goal which succeeds when the card values do NOT form a straight"
+  [a b c d e]
+  (not-a (straighto a b c d e)))
+
+;; Example - we can ask what card could be the missing to ensure we do NOT get a straight?
+(run* [a b c d e]
+  (== [a b c d e]  [:two :four :five d :three])
+  (not-a-straighto a b c d e))          ; This gives the WRONG ANSWER!!!  (hint: conda is `non-relational')
+
+
+;; But it's good enough for our purposes anyway:
+(run* [a b c d e]
+  (== [a b c d e]  [:two :four :five :ace :three])
+  (not-a-straighto a b c d e))
+
+
+
+
+
+
+
+
+
 ;; And with that, it becomes trivial:
 
 (define-poker-pred straight?
+  (not-a (flusho r s t u v))
   (membero [a b c d e] all-possible-straights))
 
+
 (define-poker-pred straight-flush?
-  (membero [a b c d e] all-possible-straights)
-  (everyg #(== r %) [s t u v]))
+  (flusho r s t u v)
+  (membero [a b c d e] all-possible-straights))
+
 
 (define-poker-pred flush?
   ;; Now we know how to fix our broken flush? function:
   ;; Add condition that we are not a straight:
-  (nilo (membero [a b c d e] all-possible-straights))
-  (everyg #(== r %) [s t u v]))
+  (flusho r s t u v)
+  (not-a-straighto a b c d e))
 
-(flush? straight-flush-hand)
-(straight-flush? straight-flush-hand)
+
+(comment
+  (flush? flush-hand)
+  (flush? straight-flush-hand)
+  (flush? nuthin-hand))
+
 
 
-;;; The high-card hand is also tricky; we need a predicate
-;;; which tells us that at least two elements of a sequence
-;;; are distinct.
-
-(defn some-distincto
-  "A relation in which some elements are distinct
-   i.e. not all elements are the same."
-  [l]
-  (fresh [h t]
-    (conso h t l)
-    (conda                              ; Explain conda
-     [(everyg #(== h %) t) u#]
-     [s# s#])))
-
+;;; The high-card hand is expensive, but straightforward:
 
 (define-poker-pred high-card?
   (distincto [a b c d e])               ; All values are different
-  (some-distincto [r s t u v]))         ; But not a flush.
+  (not-a-flusho r s t u v)              ; But not a flush.
+  (not-a-straighto a b c d e))          ; _AND_ not a straight either!
 
-(high-card? flush-hand)
-(high-card? nuthin-hand)
-
-
-
+(comment
+  (high-card? nuthin-hand)
+  (high-card? flush-hand)
+  (high-card? straight-hand))           ; very, very expensive check!!!
 
 
 ;;;; Hand validation
@@ -339,16 +391,48 @@
 
 
 ;; FIXME: Rewrite this with minikanren.
+
 (defn categorize [hand]
-  (->> all-preds
-       (map (fn [[name p]] (when (p hand) [name hand])))
-       (filter identity)
-       (first)))
+ (condp #(%1 %2) hand
+   high-card?        :high-card
+   two-pairs?        :two-pairs
+   two-of-a-kind?    :pair
+   three-of-a-kind?  :three-of-a-kind
+   straight?         :straight
+   flush?            :flush
+   full-house?       :full-house
+   four-of-a-kind?   :four-of-a-kind
+   straight-flush?   :straight-flush))
+
 
 #_
-(def results
-  (for [h all-test-hands]
-    [h (categorize (eval h))]))
+(time
+ (doall (for [h all-test-hands]
+          [h (categorize (eval h))])))
+
+
+(comment
+  (categorize straight-hand)
+  (categorize high-full-house-hand)
+  (two-pairs? full-house-hand))
+
+(comment
+  (def test-results
+    (for [h all-test-hands]
+      [h (categorize (eval h))]))
+
+  (assert (= (into #{} test-results)
+             (into #{} '[[nuthin-hand :high-card]
+                         [two-of-a-kind-hand :pair]
+                         [two-pairs-hand :two-pairs]
+                         [three-of-a-kind-hand :three-of-a-kind]
+                         [straight-hand :straight]
+                         [four-of-a-kind-hand :four-of-a-kind]
+                         [full-house-hand :full-house]
+                         [high-full-house-hand :full-house]
+                         [flush-hand :flush]
+                         [high-flush-hand :flush]
+                         [straight-flush-hand :straight-flush]]))))
 
 #_
 (let [s (rand-nth all-test-hands)
@@ -361,16 +445,15 @@
 (def results (atom {}))
 
 (comment
-  (dotimes [i 50]
-    (let [[cat h] (categorize (first (draw (shuffle deck) 5)))]
-      (assert cat (str "unable to categorize" h))
+  (dotimes [i 100]
+    (let [cat (categorize (first (draw (shuffle deck) 5)))]
       (swap! results update cat (fnil inc 0)))
     (println i)))
 
-
-(let [[l r] (draw-two-poker-hands)
-      [lcat lh] (categorize l)
-      [rcat rh] (categorize r)]
+#_
+(let [[lh rh] (draw-two-poker-hands)
+      lcat (categorize lh)
+      rcat (categorize rh)]
   (println [lcat lh])
   (println [rcat rh])
   (winner [:alice lcat]

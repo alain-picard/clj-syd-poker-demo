@@ -17,16 +17,25 @@
 
 * Motivation
 
-* miniKanren
 
-** [[file:reasoned-schemer-cover.jpg]]
+
+* Resources: 
+
+** miniKanren.org
+
+** core.logic wiki
+
+ - [[https://github.com/clojure/core.logic/wiki/A-Core.logic-Primer][https://github.com/clojure/core.logic/wiki/A-Core.logic-Primer]]
+
+** Books
+
+ - [[file:reasoned-schemer-cover.jpg]]
 
 ** A great talk:
  
-  [[https://www.youtube.com/watch?v=OyfBQmvr2Hc][William Byrd on "The Most Beautiful Program Ever Written" {PWL NYC} - YouTube]]
+ - [[https://www.youtube.com/watch?v=OyfBQmvr2Hc][William Byrd on "The Most Beautiful Program Ever Written" {PWL NYC} - YouTube]]
 
-
-
+ - And all talks on miniKanren by William Byrd
 
 * Logic programming
 
@@ -35,7 +44,10 @@ Basic idea: Programmer describes the problem.  Computer finds the solution.
 Read about =PROLOG= for historical background.
 
 
+* Whirlwind intro to core.logic
 
-* =core.logic=
+ [[file:~/Play/poker/src/poker/reasoned_schemer.clj::(ns%20poker.reasoned-schemer][some playthings]]
 
-** 
+* Poker with =core.logic=
+
+ [[file:~/Play/poker/src/poker/core.clj::(ns%20poker.core][poker source code]]

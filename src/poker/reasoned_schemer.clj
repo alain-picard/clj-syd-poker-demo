@@ -8,6 +8,7 @@
 ;;; -  == (unify)
 ;;; -  fresh
 ;;; -  goals
+;;; -  conde
 
 
 ;;; run* is how we "ask questions"
@@ -20,16 +21,23 @@
   ;; it will have the value of :foo   (only :foo, obviously)
   (== q :foo))
 
+
+(run* [q]
+  ;; Order doesn't matter --- this is the same question.
+  (== :foo q))
+
+
 (run* [q]
   ;; What values can be assigned to q so that
   ;; it will SIMULTANEOUSLY have the value of :foo and :bar?
   ;; (no such value exists)
   (== q :foo)
-  (== q :bar))
+  (== q :bar))                          ; All the goals must succeed SIMULTANEOUSLY.
+
 
 (run* [q]
   (== q :foo)
-  (== q :foo))
+  (== :foo q))
 
 
 
@@ -58,10 +66,11 @@
 
 ;;; The special goal "conde" allows us to try multiple alternatives:
 
+
 (run* [q]
   (conde
-   ((== q :bar) s#)
-   [(== q :foo) s#]))
+   [(== q :bar)]
+   [(== q :foo)]))
 
 
 
@@ -83,16 +92,20 @@
 ;;; make these two logic variables evaluate to the same value.
 
 (run* [x]
-  (== x "Logic programming rocks!"))
+  (== x "Logic programming rocks!"))  ; But William Byrd prefers to call it "relational programming"...
+
 
 (run* [x y]  ; Unconstrained!
   (== x y))
+
+
+;; FRESH: a way to introduce temporary logic variables
 
 (run* [x]    ; Unconstrained!
   (fresh [y]
     (== x y)))
 
-;; Explain order in which q and x get their values.
+;; Puzzle: explain order in which q and x get their values.
 
 (run* (q)
   (fresh [x]
@@ -104,20 +117,6 @@
 
 
 
-
-;; All the statements inside of the run* must succeed.
-
-;; s# means "successful".
-;; u# means "unsuccessful"
-
-(run* [q]
-  (nilo '(:a :b :c))
-  (== s# q))
-
-(run* [q]
-  (nilo nil)
-  (== s# q))
-
 
 
 
@@ -126,6 +125,8 @@
 
 
 
+;;;  Goals:
+;;;  ------
 ;;;  We can write our own goals functions.
 
 (defn twinso [pair] ; What does this do?
@@ -145,13 +146,45 @@
   (twinso [c d])
   (distincto [a c]))
 
+(defmacro fail-if [g]
+  `(conda
+    [~g fail]
+    [succeed]))
+
+(run* [q]
+  (== q 7)
+  (conda
+   [(membero q [2 2 4]) (== q 1) fail]
+   [s#]))
+
 (run* [a b c d e] ; full house
   (permuteo [a b c d e] [:king :three :king :three :three])
   (threeo [a b c])
-  (twinso [d e]))
+  (twinso [d e])) ; Q: Why don't we need the distincto in here?
 
 ;; An alternate way of doing it --- does this look clearer??
 (run* [a a a b b] ; full house
   (permuteo [a a a b b] [:king :three :king :three :three]))
 
 ;; Armed with this, we can now play poker.
+
+
+
+;;; Other experimental forms below
+
+(defn some-distincto
+  "A relation in which some elements are distinct
+   i.e. not all elements are the same."
+  [l]
+  (fresh [h t]
+    (conso h t l)
+    (conda                              ; Explain conda
+     [(everyg #(== h %) t) u#]
+     [s# s#])))
+
+(run* [q]                               ; Clearly broken... FIXME
+  (some-distincto [1 1 1 q]))           ; returns (), should return (_.0) ; _.0 != 1
+
+(run* [a b c]
+  (== [a b c] [3 b 3])
+  (some-distincto [a b c]))
