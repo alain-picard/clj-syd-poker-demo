@@ -23,6 +23,7 @@
    [hand :pair]
    [hand :high-card]
 
+   ;; Will be read as: (beats winner loser)
    [beats :straight-flush :four-of-a-kind]
    [beats :four-of-a-kind :full-house]
    [beats :full-house :flush]           ; Hope I didn't make a mistake
@@ -44,21 +45,36 @@
   (run* [who]
     (beats who :straight-flush)))
 
+;; Comparing any two arbitrary hands,
 
 (defn bettero
-  "A relation returning all hands capable of beating HAND."
-  [hand who]
+  "A relation returning all combinations of WINNING-HANDs capable of beating LOSING-HANDs."
+  [losing-hand winning-hand]
   (conde
-   [(emptyo hand) s#]
-   [(beats who hand) s#]
+   [(emptyo losing-hand) u#]
+   [(beats winning-hand losing-hand) s#]
    [s#     (fresh [next]
-             (beats next hand)
-             (bettero next who))]))
+             (beats next losing-hand)
+             (bettero next winning-hand))]))
 
-(db/with-db  poker-rules
+;; What hands can beat :three-of-a-kind ?
+(db/with-db poker-rules
   (run* [winner]
-     ;; Should return all hands which can beat :three-of-a-kind
      (bettero :three-of-a-kind winner)))
+
+
+;; What hands can a flush beat ?
+(db/with-db poker-rules
+  (run* [loser] (bettero loser :flush)))
+
+;; Or just enumerate all possible matchings:
+(db/with-db poker-rules
+  (run* [loser winner]
+    (bettero loser winner)))
+
+
+
+
 
 
 
@@ -66,27 +82,23 @@
 
 (defn winner
   "Compare the hands of two \"players\", each of which is a pair
-   of [player-name poker-hand].  Returns a map indicating the winner and loser
+   of [player-name poker-hand].  Returns the PLAYER-NAME of the winner
    (or nil, in case of a draw)
 
    This does NOT handle ranking players by highest card if they have equal types
    of hands---don't base your gambling start-up off of this code!!!"
-  [player-left player-right]
+  [[left-name left-hand] [right-name right-hand]]
   (db/with-db poker-rules
-    (run* [q]
-      (fresh [losing-hand loser-name winning-hand winner-name loser winner]
-        (bettero losing-hand winning-hand)   ; Enumerates all pairs of which hand beats which
-        (== loser  [loser-name losing-hand]) ; loser, winner are just helper vars for clarity
-        (== winner [winner-name winning-hand])
-        (conde    ; We have 2 cases; either the winning player is player-right, or he's player-left.
-         [(== winner player-right)             ; Winning player is player-RIGHT
-          (== loser  player-left)
-          (== q {:winner player-right
-                 :loser player-left}) s#]
-         [(== winner player-left)               ; Winning player is player-LEFT
-          (== loser  player-right)
-          (== q {:winner player-left
-                 :loser player-right}) s#])))))
+    (first
+     (run 1 [q]
+       (fresh [winning-hand]
+         (conde
+          [(== winning-hand right-hand)      ; Read it like this:  If the winning hand is the right-hand
+           (bettero left-hand winning-hand)  ; then it must be able to beat the left hand,
+           (== q right-name)]                ; therefore our winner is the player associated with right-hand.
+          [(== winning-hand left-hand)       ; ibid for the winning hand being the left hand.
+           (bettero right-hand winning-hand) ; but now he can beat the _right_ hand.  Careful!
+           (== q left-name)]))))))
 
 
 (winner [:bob :two-pairs] [:alice :flush])
