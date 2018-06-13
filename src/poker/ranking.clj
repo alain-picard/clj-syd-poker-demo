@@ -27,11 +27,10 @@
    [beats :four-of-a-kind :full-house]
    [beats :full-house :flush]           ; Hope I didn't make a mistake
    [beats :flush :straight]             ; And this is who beats what.
-   [beats :straight :three-of-a-kind] ; in copying the rules.  :-)
+   [beats :straight :three-of-a-kind]   ; in copying the rules.  :-)
    [beats :three-of-a-kind :two-pairs]
    [beats :two-pairs :pair]
    [beats :pair :high-card]))
-
 
 (db/with-db  poker-rules
   (run* [who]                           ; A pair beats only a high hand
@@ -41,9 +40,9 @@
   (run* [who]                           ; a :high-hand beats nobody
     (beats :high-card who)))
 
-(db/with-db  poker-rules                ; nobody beats a straight
+(db/with-db  poker-rules                ; nobody beats a straight flush
   (run* [who]
-    (beats who :straight)))
+    (beats who :straight-flush)))
 
 
 (defn bettero
@@ -76,18 +75,18 @@
   (db/with-db poker-rules
     (run* [q]
       (fresh [losing-hand loser-name winning-hand winner-name loser winner]
-        (bettero losing-hand winning-hand) ; Enumerates all pairs of which hand beats which
-        (== loser  [loser-name losing-hand])   ; loser, winner are just helper vars for clarity
+        (bettero losing-hand winning-hand)   ; Enumerates all pairs of which hand beats which
+        (== loser  [loser-name losing-hand]) ; loser, winner are just helper vars for clarity
         (== winner [winner-name winning-hand])
-        (conde ; We have 2 cases; either the winning player is player-right, or he's player-left.
-         [(all (== winner player-right)
-               (== loser  player-left)
-               (== q {:winner player-right
-                      :loser player-left})) s#]
-         [(all (== winner player-left)           ; Winning player is player-left
-               (== loser  player-right)
-               (== q {:winner player-left
-                      :loser player-right})) s#])))))
+        (conde    ; We have 2 cases; either the winning player is player-right, or he's player-left.
+         [(== winner player-right)             ; Winning player is player-RIGHT
+          (== loser  player-left)
+          (== q {:winner player-right
+                 :loser player-left}) s#]
+         [(== winner player-left)               ; Winning player is player-LEFT
+          (== loser  player-right)
+          (== q {:winner player-left
+                 :loser player-right}) s#])))))
 
 
 (winner [:bob :two-pairs] [:alice :flush])
