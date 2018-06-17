@@ -27,8 +27,8 @@
    [beats :straight-flush :four-of-a-kind]
    [beats :four-of-a-kind :full-house]
    [beats :full-house :flush]           ; Hope I didn't make a mistake
-   [beats :flush :straight]             ; And this is who beats what.
-   [beats :straight :three-of-a-kind]   ; in copying the rules.  :-)
+   [beats :flush :straight]             ; in copying the rules.  :-)
+   [beats :straight :three-of-a-kind]
    [beats :three-of-a-kind :two-pairs]
    [beats :two-pairs :pair]
    [beats :pair :high-card]))
@@ -44,6 +44,7 @@
 (db/with-db  poker-rules                ; nobody beats a straight flush
   (run* [who]
     (beats who :straight-flush)))
+
 
 ;; Comparing any two arbitrary hands,
 
@@ -96,6 +97,7 @@
           [(== winning-hand right-hand)      ; Read it like this:  If the winning hand is the right-hand
            (bettero left-hand winning-hand)  ; then it must be able to beat the left hand,
            (== q right-name)]                ; therefore our winner is the player associated with right-hand.
+
           [(== winning-hand left-hand)       ; ibid for the winning hand being the left hand.
            (bettero right-hand winning-hand) ; but now he can beat the _right_ hand.  Careful!
            (== q left-name)]))))))

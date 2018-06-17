@@ -50,7 +50,7 @@
   (conso :foo '(:bar :baz) q))
 
 (run* [q]
-  (conso :foo `(~q :baz) '(:foo :bar :baz)))
+  (conso :foo (list q :baz) '(:foo :bar :baz)))
 
 (run* [q]
   (conso q '(:bar :baz) '(:foo :bar :baz)))
@@ -146,16 +146,6 @@
   (twinso [c d])
   (distincto [a c]))
 
-(defmacro fail-if [g]
-  `(conda
-    [~g fail]
-    [succeed]))
-
-(run* [q]
-  (== q 7)
-  (conda
-   [(membero q [2 2 4]) (== q 1) fail]
-   [s#]))
 
 (run* [a b c d e] ; full house
   (permuteo [a b c d e] [:king :three :king :three :three])
@@ -188,3 +178,14 @@
 (run* [a b c]
   (== [a b c] [3 b 3])
   (some-distincto [a b c]))
+
+(defmacro fail-if [g]
+  `(conda
+    [~g fail]
+    [succeed]))
+
+(run* [q]
+  (== q 7)
+  (conda
+   [(membero q [2 2 4]) (== q 1) fail]
+   [s#]))
