@@ -1,7 +1,8 @@
 (ns poker.core
   (:refer-clojure :exclude [==])
   (:require [clojure.core.logic :refer :all])
-  (:require [poker.ranking :refer [winner]]))
+  (:require [poker.ranking :refer [winner]])
+  (:require [clojure.pprint :refer [cl-format]]))
 
 
 ;;;;  Card Abstract data types.
@@ -394,6 +395,30 @@
 
 
 
+;;; Let's play some poker:
+
+(defn play-a-round [l r]                ; left, right
+  (let [players (set [l r])
+        [lh rh] (draw-two-poker-hands)
+        lcat (categorize lh)
+        rcat (categorize rh)
+        hand {l lcat r rcat}
+        winner (winner [l lcat] [r rcat]) ; This line plays the game
+        loser  (first (disj players winner))]
+    (println winner)
+    (if winner
+      (cl-format nil
+                 "~a wins over ~a because ~a beats a ~a"
+                 winner
+                 loser
+                 (hand winner)
+                 (hand loser))
+      (cl-format nil
+                 "Game is a draw.  Players hands were ~A and ~A." lcat rcat))))
+
+(play-a-round :alice :bob)
+
+
 ;;;; Tests
 (defn- check [pred hand]
   (assert (pred hand)))
@@ -473,14 +498,7 @@
       (swap! results update cat (fnil inc 0)))
     (println i)))
 
-#_
-(let [[lh rh] (draw-two-poker-hands)
-      lcat (categorize lh)
-      rcat (categorize rh)]
-  (println [lcat lh])
-  (println [rcat rh])
-  (winner [:alice lcat]
-          [:bob   rcat]))
+
 
 
 #_
