@@ -7,29 +7,29 @@
 ;;;;  Card Abstract data types.
 
 (def ranks
-  "The face values in a suite of cards"
+  "The face values in a suit of cards"
   [:two :three :four :five :six :seven :eight :nine :ten :jack :queen :king :ace])
 
 (defn rank-value [rank] (.indexOf ranks rank))
 
-(def suites
-  "The suites in a deck of cards"
+(def suits
+  "The suits in a deck of cards"
   [:spades :clubs :hearts :diamonds])
 
 ;; Note that the official rules of poker do not indicate a ranking
-;; of suites; thus you can have official "ties" in a poker hand.
+;; of suits; thus you can have official "ties" in a poker hand.
 ;; e.g.  [[:king :hearts]   [:king :clubs]  [:four :spades] [:three :spades] [:two :spades]]
 ;;  ==   [[:king :diamonds] [:king :spades] [:four :diamonds] [:three :diamonds] [:two :diamonds]]
 ;;
 ;; Yeah, this surprised me as well.
 
 (defn card
-  "Produce a card of rank RANK in suite SUITE"
-  [rank suite]
-  [rank suite])
+  "Produce a card of rank RANK in suit SUIT"
+  [rank suit]
+  [rank suit])
 
 (defn card-rank [card] (first card))
-(defn card-suite [card] (second card))
+(defn card-suit [card] (second card))
 
 (defn card-value [card]
   (rank-value (card-rank card)))
@@ -37,9 +37,9 @@
 (def deck
   "A regular deck of cards.
   To shuffle a deck, use the built-in clojure.core/shuffle function."
-  (for [suite suites
+  (for [suit suits
         rank ranks]
-    (card rank suite)))
+    (card rank suit)))
 
 (assert (= 52 (count deck)))
 
@@ -154,7 +154,7 @@
   [hand]
   (run-1 [q]
     (fresh [a b c d e  ; ranks
-            r s t u v] ; suites
+            r s t u v] ; suits
       (== q [[a r] [b s] [c t] [d u] [e v]]) ; Answer looks like the full hand.
       (permuteo [[a r] [a s] [c t] [d u] [e v]] hand)
       ;; And, redundant, but binding `b' allows us to get
@@ -167,9 +167,9 @@
   "Returns the value of highest ranked card suit if HAND is a flush, otherwise nil."
   [hand]
   (let [hand (sort-hand hand)
-        suites (map card-suite hand)] ; If we match, the first card will be the highest in the suit.
-    (if (run-1 [suite]
-          (== [suite suite suite suite suite] suites))
+        suits (map card-suit hand)] ; If we match, the first card will be the highest in the suit.
+    (if (run-1 [suit]
+          (== [suit suit suit suit suit] suits))
       (card-rank (first hand)))))
 
 
