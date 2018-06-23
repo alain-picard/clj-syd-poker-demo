@@ -202,15 +202,19 @@
   `(defn ~name
      [hand#]
      (run-1 [q#]
-       (fresh [~'a ~'b ~'c ~'d ~'e ~' r ~'s ~'t ~'u ~'v]
+       (fresh [~'a ~'b ~'c ~'d ~'e
+               ~'r ~'s ~'t ~'u ~'v]
          ;; Try every permutation of the hand into the available lvars
-         (permuteo [[~'a ~'r] [~'b ~'s] [~'c ~'t] [~'d ~'u] [~'e ~'v]] hand#) ; Answer looks like the full hand.
+         (permuteo [[~'a ~'r] [~'b ~'s] [~'c ~'t] [~'d ~'u] [~'e ~'v]] hand#)
+         ;; Answer looks like the full hand.
          (== q# [[~'a ~'r] [~'b ~'s] [~'c ~'t] [~'d ~'u] [~'e ~'v]])
+         ;; Clauses spliced in are supposed to disambiguate what the hand will look like.
          ~@clauses))))
 
 
 
-;;;; Armed with define-poker-pred, we can now rewrite our predicates a bit more clearly:
+;;;; The Payoff.
+;;;  Armed with define-poker-pred, the rules just about write themselves:
 
 (define-poker-pred two-of-a-kind?
   (== a b)
@@ -230,7 +234,7 @@
 
 (define-poker-pred full-house?
   ;; Note, there is no need to check for (distinct [a d])
-  ;; as there cannot be 5 cars of the same rank in a hand (under these rules).
+  ;; as there cannot be 5 cards of the same rank in a hand (under these rules).
   (== a b) (== a c) ; and (== b c) is redundant
   (== d e))
 
@@ -240,12 +244,33 @@
   (== a d))
 
 
+;;; Those were all the "easy" hands; what about flushes and straights?
 
-(defn flusho
+(defn flusho ; This could also have been called `all-sameo', or `not-distincto'
   "A goal which succeeds when the specified suits constitute a flush."
   [r s t u v]
+  ;; A hand is flush if the 2nd, third card etc all
+  ;; have the same suit as the first one.
   (everyg #(== r %) [s t u v]))
 
+
+(define-poker-pred flush?
+  ;; A hand is flush if the 2nd, third card etc all
+  ;; have the same suit as the first one.
+  ;; (actually, this is buggy... because a straight-flush should not get matched.
+  ;;  More on that below.)
+  (flusho r s t u v))
+
+
+
+
+
+;;;; Writing negations --- Turns out to be
+;;;;  - difficult,
+;;;;  - tricky,
+;;;;  - and not recommended.
+;;;;
+;;;; Negations turn out to be "non-relational".
 
 (defmacro not-a [goal]
   `(conda                               ; Terrible hack.  Even experts agree.
@@ -258,13 +283,13 @@
   [r s t u v]
   (not-a (flusho r s t u v)))
 
+(run* [q]
+  (flusho 1 1 1 q 1))
 
-(define-poker-pred flush?
-  ;; A hand is flush if the 2nd, third card etc all
-  ;; have the same suite as the first one.
-  ;; (actually, this is buggy... because a straight-flush should not get matched.
-  ;;  More on that below.)
-  (flusho r s t u v))
+(run* [q]  ; Here is what "non-relational" means
+  (not-a-flusho 1 1 1 q 1))
+
+
 
 
 ;; The straight is tricky, so I simply enumerate every possibility:
@@ -290,9 +315,8 @@
     (membero [x y z q r] all-possible-straights)))
 
 ;; Example - we can ask what card could be the missing to constitute a straight?
-(run* [a b c missing e]
-  (== [a b c missing e]  [:two :four :five missing :three])
-  (straighto a b c missing e))
+(run* [missing]
+  (straighto :three :two :four missing :five))
 
 
 ;; And we'll need the converse
@@ -324,8 +348,8 @@
 ;; And with that, it becomes trivial:
 
 (define-poker-pred straight?
-  (not-a (flusho r s t u v))
-  (membero [a b c d e] all-possible-straights))
+  (membero [a b c d e] all-possible-straights) ; I don't use straighto because I'm already permuting.
+  (not-a (flusho r s t u v)))
 
 
 (define-poker-pred straight-flush?
@@ -345,7 +369,6 @@
   (flush? straight-flush-hand)
   (flush? nuthin-hand))
 
-
 
 ;;; The high-card hand is expensive, but straightforward:
 
@@ -357,15 +380,15 @@
 (comment
   (high-card? nuthin-hand)
   (high-card? flush-hand)
-  (high-card? straight-hand))           ; very, very expensive check!!!
+  (time (high-card? straight-hand)))         ; very, very expensive check!!!
 
 
 ;;;; Hand validation
 
 (define-poker-pred valid?
-  ;; Every rank and suite is valid
+  ;; Every rank and suit is valid
   (everyg #(membero % ranks) [a b c d e])
-  (everyg #(membero % suites) [r s t u v])
+  (everyg #(membero % suits) [r s t u v])
   ;; And we have no duplicate cards
   (distincto [[a r] [b s] [c t] [d u] [e v]]))
 
@@ -442,7 +465,7 @@
  (categorize  h))
 
 
-(def results (atom {}))
+(defonce results (atom {}))
 
 (comment
   (dotimes [i 100]

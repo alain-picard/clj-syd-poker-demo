@@ -14,34 +14,104 @@
 ;;; run* is how we "ask questions"
 ;;;
 ;;; Unification: == is the basic operator for saying:
-;;; make these two logic variables evaluate to the same value.
+;;; attempt to make these two logic variables evaluate to the same value.
 
 (run* [q]
   ;; This is read as: What values can be assigned to q so that
   ;; it will have the value of :foo   (only :foo, obviously)
   (== q :foo))
 
-
 (run* [q]
   ;; Order doesn't matter --- this is the same question.
   (== :foo q))
-
 
 (run* [q]
   ;; What values can be assigned to q so that
   ;; it will SIMULTANEOUSLY have the value of :foo and :bar?
   ;; (no such value exists)
-  (== q :foo)
-  (== q :bar))                          ; All the goals must succeed SIMULTANEOUSLY.
+  (== q :foo)                          ; All the goals must succeed SIMULTANEOUSLY.
+  (== q :bar))
 
 
-(run* [q]
+
+;;; Unification part II:
+;;;
+;;; You can ask multiple questions, about multiple statements (goals) simultaneously.
+;;;
+
+(run* [x]
+  (== x "Logic programming rocks!"))  ; But William Byrd prefers to call it "relational programming"...
+
+(run* [p q]
   (== q :foo)
-  (== :foo q))
+  (== :bar p))
+
+(run* [p q]
+  (== q :foo))
+
+(run* [x y]
+  (== x y))
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 
+;;; The special goal "CONDE" allows us to try multiple alternatives,
+;;; thus we can get more than one valid answer to a "question"
+
+(run* [q]
+  (conde
+   [(== q :bar)]
+   [(== q :foo)]))
+
+;;; Special goals, s# and u# (succeed, fail)
+
+(run* [q]
+  (conde
+   [(== q :bar) s#]
+   [(== q :foo) u#]))
+
+(run* [q]
+  fail
+  (conde
+   [(== q :bar) succeed]
+   [(== q :foo) fail]))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;; FRESH: a way to introduce temporary logic variables
+
+(run* [x]    ; Unconstrained!
+  (fresh [y]
+    (== x y)))
+
+
+
+;; "Relational" programming; about describing "relations" between logic variables
+;;
 ;; Questions can be asked about any components.
 ;; There is not a "place for the output"; any
 ;; logic variable in any goal can be solved for.
@@ -63,80 +133,21 @@
 
 
 
-
-;;; The special goal "conde" allows us to try multiple alternatives:
-
-
-(run* [q]
-  (conde
-   [(== q :bar)]
-   [(== q :foo)]))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
-;;; Unification part II:
-;;; Unification: == is the basic operator for saying:
-;;; make these two logic variables evaluate to the same value.
-
-(run* [x]
-  (== x "Logic programming rocks!"))  ; But William Byrd prefers to call it "relational programming"...
-
-
-(run* [x y]  ; Unconstrained!
-  (== x y))
-
-
-;; FRESH: a way to introduce temporary logic variables
-
-(run* [x]    ; Unconstrained!
-  (fresh [y]
-    (== x y)))
-
-;; Puzzle: explain order in which q and x get their values.
-
-(run* (q)
-  (fresh [x]
-    (== `(:d :a ~x :c) q)
-    (conso x `(:a ~x :c) q)))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+;;;
 ;;;  Goals:
 ;;;  ------
 ;;;  We can write our own goals functions.
 
 (defn twinso [pair] ; What does this do?
   (fresh [x y]
-    (conso x [y] pair)
+    (== [x y] pair)
     (== x y)))
 
 (defn threeo [triplet]
   (fresh [a b c]
-    (conso a [b c] triplet)
+    (== [a b c] triplet)
     (== a b)
     (== a c)))
 
@@ -145,7 +156,6 @@
   (twinso [a b])
   (twinso [c d])
   (distincto [a c]))
-
 
 (run* [a b c d e] ; full house
   (permuteo [a b c d e] [:king :three :king :three :three])
