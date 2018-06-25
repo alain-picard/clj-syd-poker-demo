@@ -75,11 +75,10 @@
   "A relation returning all combinations of WINNING-HANDs capable of beating LOSING-HANDs."
   [winning-hand losing-hand]
   (conde
-   [(emptyo winning-hand) u#]
-   [(beats winning-hand losing-hand) s#]
-   [s#     (fresh [next]
-             (beats next losing-hand)
-             (bettero winning-hand next))]))
+   [(beats winning-hand losing-hand)]
+   [(fresh [next]
+      (beats next losing-hand)
+      (bettero winning-hand next))]))
 
 ;; What hands can beat :three-of-a-kind ?
 (db/with-db poker-rules
@@ -115,15 +114,14 @@
   (db/with-db poker-rules
     (first
      (run 1 [q]
-       (fresh [winning-hand]
-         (conde
-          [(== winning-hand right-hand)      ; Read it like this:  If the winning hand is the right-hand
-           (bettero winning-hand left-hand)  ; then it must be able to beat the left hand,
-           (== q right-name)]                ; therefore our winner is the player associated with right-hand.
+       (conde
+        [ ;; Read it like this:  If the winning hand is the right-hand
+         (bettero right-hand left-hand)  ; then it must be able to beat the left hand,
+         (== q right-name)]                ; therefore our winner is the player associated with right-hand.
 
-          [(== winning-hand left-hand)       ; ibid for the winning hand being the left hand.
-           (bettero winning-hand right-hand) ; but now he can beat the _right_ hand.  Careful!
-           (== q left-name)]))))))
+        [ ;; ibid for the winning hand being the left hand.
+         (bettero left-hand right-hand) ; but now he can beat the _right_ hand.  Careful!
+         (== q left-name)])))))
 
 
 
