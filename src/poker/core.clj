@@ -125,7 +125,6 @@
    four-of-a-kind-hand full-house-hand high-full-house-hand flush-hand high-flush-hand
    straight-flush-hand])
 
-
 ;;;; Utilities
 
 (defmacro run-1

@@ -46,6 +46,9 @@
   (== q :foo)
   (== :bar p))
 
+
+;;;  If your questions are incomplete, or under specified, you get ambiguous answers
+
 (run* [p q]
   (== q :foo))
 

@@ -48,11 +48,3 @@ Basic idea: Programmer describes the problem.  Computer finds the solution.
 You can find the code presented here at https://github.com/alain-picard/clj-syd-poker-demo
 
 * Thank you!
-
-* Whirlwind intro to core.logic
-
- [[file:~/Play/poker/src/poker/reasoned_schemer.clj::(ns%20poker.reasoned-schemer][some playthings]]
-
-* Poker with =core.logic=
-
- [[file:~/Play/poker/src/poker/core.clj::(ns%20poker.core][poker source code]]
