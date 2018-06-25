@@ -43,6 +43,11 @@ is based on /miniKanren/
 
 Basic idea: Programmer describes the problem.  Computer finds the solution.
 
+* Play with this code
+
+You can find the code presented here at https://github.com/alain-picard/clj-syd-poker-demo
+
+* Thank you!
 
 * Whirlwind intro to core.logic
 
